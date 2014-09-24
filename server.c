@@ -1,20 +1,46 @@
 #include "common.h"
 #include <time.h>
+#include <signal.h>
 
 #define SHMSZ1 800 // 800 bytes of shared memory for 4 priority queues
 #define SHMSZ2 100  // 100 bytes of shared memory for 4 flags per queue to denote full/empty queue
 
 int call_service(int);
+struct client_request *q1,*q2,*q3,*q4; // Four priority queues
+int *queue_full; // pointer to indicate the status(full/empty) of each queue
+int shmid1, shmid2;
+
+void sig_handler(int signo)
+{
+    //printf("\n In sig handler \n");
+  // SIGINT handler to cleanup the shared memory segment if Ctrl+C pressed
+  if (signo == SIGINT){
+    
+    printf("received SIGINT\n");
+    shmdt(q1);
+    shmdt(queue_full);
+    shmctl(shmid1, IPC_RMID, NULL);
+    shmctl(shmid2, IPC_RMID, NULL);
+    exit(0);
+
+  }
+  else{
+    printf("Caught unknown signal!!! \n");
+  }      
+}
+
 
 main()
 {
     char c;
-    int shmid1, shmid2;
+    
     key_t key1, key2;
-    struct client_request *q1,*q2,*q3,*q4; // Four priority queues
-    int *shm_full;
+    
     int requestsPerQueue = 5, numRequest, i;
     srand(time(NULL)); 
+
+    if (signal(SIGINT, sig_handler) == SIG_ERR)
+            printf("\nError catching SIGINT\n");
 
     //char *shm, *s;
 
@@ -36,7 +62,7 @@ main()
         exit(1);
     }
 
-    if ((shm_full = (int*)shmat(shmid2, NULL, 0)) == (int *) -1) {
+    if ((queue_full = (int*)shmat(shmid2, NULL, 0)) == (int *) -1) {
         perror("shmat");
         exit(1);
     }
@@ -54,8 +80,8 @@ main()
     while(1){
 
          // Check if queue 1 has data
-         if(*shm_full != 1)
-            shm_full++;
+         if(*queue_full != 1)
+            queue_full++;
          else{
             // queue1 has data
             int min_fifo_prio = 32767, min_fifo_index = 32767;
@@ -70,6 +96,7 @@ main()
 
             // min_fifo_index has the request with least FIFO priority, service it now
             if(min_fifo_index != 32767){
+                printf("\n Servicing request from queue 1 at index %d \n",min_fifo_index);
                 q1[min_fifo_index].output = call_service(q1[min_fifo_index].input);
                 q1[min_fifo_index].valid = 1; // Indicate the client that the service is complete
             }  
@@ -77,8 +104,8 @@ main()
          }
             
          // Checking queue2 is empty or not
-         if(*shm_full != 1)
-            shm_full++;
+         if(*queue_full != 1)
+            queue_full++;
          else{
             // queue2 has data
             // Service 2 requests from queue2
@@ -97,6 +124,7 @@ main()
 
                 // min_fifo_index has the request with least FIFO priority, service it now
                 if(min_fifo_index != 32767){
+                    printf("\n Servicing request from queue 2 at index %d \n",min_fifo_index);
                     q2[min_fifo_index].output = call_service(q2[min_fifo_index].input);
                     q2[min_fifo_index].valid = 1; // Indicate the client that the service is complete
                 }    
@@ -104,8 +132,8 @@ main()
          }
 
          // Checking queue3 is empty or not
-         if(*shm_full != 1)
-            shm_full++;
+         if(*queue_full != 1)
+            queue_full++;
          else{
             // queue3 has data
             // Service 3 requests from queue3
@@ -124,6 +152,7 @@ main()
 
                 // min_fifo_index has the request with least FIFO priority, service it now
                 if(min_fifo_index != 32767){
+                    printf("\n Servicing request from queue 3 at index %d \n",min_fifo_index);
                     q3[min_fifo_index].output = call_service(q3[min_fifo_index].input);
                     q3[min_fifo_index].valid = 1; // Indicate the client that the service is complete
                 }    
@@ -132,8 +161,8 @@ main()
 
 
          // Checking queue4 is empty or not
-         if(*shm_full != 1)
-            shm_full-=3; // Move pointer back to queue1's flag
+         if(*queue_full != 1)
+            queue_full-=3; // Move pointer back to queue1's flag
          else{
             // queue4 has data
             // Service 4 requests from queue4
@@ -152,6 +181,7 @@ main()
 
                 // min_fifo_index has the request with least FIFO priority, service it now
                 if(min_fifo_index != 32767){
+                    printf("\n Servicing request from queue 4 at index %d \n",min_fifo_index);
                     q4[min_fifo_index].output = call_service(q4[min_fifo_index].input);
                     q4[min_fifo_index].valid = 1; // Indicate the client that the service is complete
                 }    
@@ -165,13 +195,7 @@ main()
     // }   
 
     // Detach and remove the shared memory segment
-    shmdt(q1);
-    shmdt(shm_full);
-
-    shmctl(shmid1, IPC_RMID, NULL);
-    shmctl(shmid2, IPC_RMID, NULL);
-
-    exit(0);
+    
 }
 
 int call_service(int input){
