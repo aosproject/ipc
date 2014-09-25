@@ -36,7 +36,7 @@ main()
     
     key_t key1, key2;
     
-    int requestsPerQueue = 5, numRequest, i;
+    int numQueues = 4, requestsPerQueue = 5, numRequest, i;
     srand(time(NULL)); 
 
     if (signal(SIGINT, sig_handler) == SIG_ERR)
@@ -68,20 +68,41 @@ main()
     }
 
     // 40 bytes for 1 request
-    // printf("size of structure object = %lu\n", sizeof(client_request));
-
 
     // q2, q3, q4 point to head of individual queues
     q2 = q1 + requestsPerQueue; 
     q3 = q2 + requestsPerQueue;
     q4 = q3 + requestsPerQueue;
 
+    client_request *q_init_iterator = q1;
+    // **** Initialization of request queue parameters for all queues
+
+    for(i=1; i<numQueues*requestsPerQueue; i++, q_init_iterator++)
+    {
+        q_init_iterator->PID = 0;       // getpid() -> process id of the calling process
+        q_init_iterator->reqID = 0;     // keeps track of the current request number
+        q_init_iterator->input = 0;     // input to the server
+        q_init_iterator->output = 0;        // result of tjhe service
+        q_init_iterator->fifo_priority = 0; // global counter in shared memory to implement priority (set to 0 initially)
+        q_init_iterator->valid = 0;     // indicates if result is valid
+        q_init_iterator->full = 0;      // indicates if queue slot is used or not
+    }
+
+    int *int_iterator = queue_full;
+    for(i=0; i<12; i++, int_iterator++)
+    {
+       *int_iterator = 0;
+    }
+
     // Loop forever
     while(1){
-	 //printf("queue full = %d \b", *queue_full);
+        sleep(10);
+	    //printf("queue full = %d \b", *queue_full);
          // Check if queue 1 has data
-         if(*queue_full != 1)
+         if(*queue_full != 1){
+            //printf("queue 1 empty\n");
             queue_full++;
+         }  
          else{
             // queue1 has data
             int min_fifo_prio = 32767, min_fifo_index = 32767;
@@ -104,8 +125,10 @@ main()
          }
             
          // Checking queue2 is empty or not
-         if(*queue_full != 1)
+         if(*queue_full != 1){
+            printf("queue 2 empty\n");
             queue_full++;
+         }
          else{
             // queue2 has data
             // Service 2 requests from queue2
