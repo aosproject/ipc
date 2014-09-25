@@ -78,7 +78,7 @@ main()
 
     // Loop forever
     while(1){
-
+	 //printf("queue full = %d \b", *queue_full);
          // Check if queue 1 has data
          if(*queue_full != 1)
             queue_full++;

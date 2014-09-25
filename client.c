@@ -1,6 +1,7 @@
 #include "common.h"
 
-#define SHMSZ  1000
+#define SHMSZ1 800
+#define SHMSZ2 100
 #define REQ_LIMIT 10
 #define QUEUE_SIZE 5
 #define PRIO 0
@@ -14,7 +15,7 @@ void Sync_API(client_request *q, int *queue_full)
 	int i=1;
 	for(; i< QUEUE_SIZE; i++, q_init_iterator++)
 	{
-		q_init_iterator->PID = 0; 		// getpid() -> process id of the calling process
+	q_init_iterator->PID = 0; 		// getpid() -> process id of the calling process
     	q_init_iterator->reqID = 0;		// keeps track of the current request number
     	q_init_iterator->input = 0;		// input to the server
     	q_init_iterator->output = 0;		// result of tjhe service
@@ -23,13 +24,13 @@ void Sync_API(client_request *q, int *queue_full)
     	q_init_iterator->full = 0;		// indicates if queue slot is used or not
 	}
 	
-    *queue_full = 0;	// indicates that the queue has something inside it
+    	*queue_full = 0;	// indicates that the queue has something inside it
 	int *queue_counter = queue_full + 4;
 
 	int *queue_fifo_id_counter = queue_full + 8; // to keep track of global fifo_priority ID
 
 	while(req_count < REQ_LIMIT)
-	{
+	{	printf("Request count:%d \n",req_count);
 		//semwait:
 		// Need to check to see if semaphore locked (sem_wait) -- TODO
 		client_request *q_index = q;
@@ -44,16 +45,16 @@ void Sync_API(client_request *q, int *queue_full)
 				q_index->input = 2;
 				q_index->fifo_priority = (*queue_fifo_id_counter)++; //fifo prio based on global counter
 				q_index->full = 1;
-				if(queue_full == 0)
-				{
+				if(*queue_full == 0)
+				{  printf("changing queue full\n");
 					(*queue_full) = 1;
 				}
 				(*queue_counter) += 1;
 				//req_count++;
 
 				// Release the lock -- TODO
-
-				while(q_index->valid); //Need to spin on the valid bit
+				printf("valid bit of queue index = %d \n",q_index->valid);
+				while(!q_index->valid); //Need to spin on the valid bit
 				// might need to get lock here
 				printf("The result is %d \n", q_index->output);
 				(*queue_counter) -= 1;
@@ -64,7 +65,7 @@ void Sync_API(client_request *q, int *queue_full)
 				// Release the queue lock held (sem_post)-- TODO
 				q_index->full = 0;
 				q_index->valid = 0;
-		
+				break;	
 
 			}
 
@@ -86,12 +87,12 @@ main()
     key1 = 12; // shared memory for the queues
     key2 = 23; // shared memory to signal queue full
 
-    if ((shmid1 = shmget(key1, SHMSZ, 0666)) < 0) {
+    if ((shmid1 = shmget(key1, SHMSZ1, 0666)) < 0) {
         perror("error");
         exit(1);
     }
 
-    if ((shmid2 = shmget(key2, SHMSZ, 0666)) < 0) {
+    if ((shmid2 = shmget(key2, SHMSZ2, 0666)) < 0) {
         perror("error");
         exit(1);
     }
