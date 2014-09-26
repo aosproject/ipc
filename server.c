@@ -1,3 +1,8 @@
+/*queue_full usage:
+first 4 slots are flags to denote whether respective queues are full(1) or empty(0)
+next 4 slots are counters of requests per queue
+next 4 slots are fifo_priority counters per queue*/
+
 #include "common.h"
 #include <time.h>
 #include <signal.h>
@@ -100,7 +105,7 @@ main()
 	    //printf("queue full = %d \b", *queue_full);
          // Check if queue 1 has data
          if(*queue_full != 1){
-            //printf("queue 1 empty\n");
+            printf("queue 1 empty\n");
             queue_full++;
          }  
          else{
@@ -155,8 +160,10 @@ main()
          }
 
          // Checking queue3 is empty or not
-         if(*queue_full != 1)
+         if(*queue_full != 1){
+            printf("queue 3 empty\n");
             queue_full++;
+         }
          else{
             // queue3 has data
             // Service 3 requests from queue3
@@ -184,8 +191,10 @@ main()
 
 
          // Checking queue4 is empty or not
-         if(*queue_full != 1)
-            queue_full-=3; // Move pointer back to queue1's flag
+         if(*queue_full != 1){
+            printf("queue 4 empty\n");
+            queue_full -= 3;
+         } // Move pointer back to queue1's flag
          else{
             // queue4 has data
             // Service 4 requests from queue4
