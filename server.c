@@ -9,11 +9,13 @@ next 4 slots are fifo_priority counters per queue*/
 
 #define SHMSZ1 800 // 800 bytes of shared memory for 4 priority queues
 #define SHMSZ2 100  // 100 bytes of shared memory for 4 flags per queue to denote full/empty queue
+#define SHMSZ3 100  // 100 bytes of shared memory for semaphore variable
 
 int call_service(int);
 struct client_request *q1,*q2,*q3,*q4; // Four priority queues
 int *queue_full; // pointer to indicate the status(full/empty) of each queue
-int shmid1, shmid2;
+sem_t *semVar;   // Semaphore variable
+int shmid1, shmid2, shmid3;
 
 void sig_handler(int signo)
 {
@@ -39,7 +41,7 @@ main()
 {
     char c;
     
-    key_t key1, key2;
+    key_t key1, key2, key3;
     
     int numQueues = 4, requestsPerQueue = 5, numRequest, i;
     srand(time(NULL)); 
@@ -50,7 +52,8 @@ main()
     //char *shm, *s;
 
     key1 = 12; // shared memory for the queues
-    key2 = 23; // shared memory to signal queue full
+    key2 = 23; // shared memory for queue_full, fifo_priority etc.
+    key3 = 34; // Shared memory for semaphore variable
 
     if ((shmid1 = shmget(key1, SHMSZ1, IPC_CREAT | 0666)) < 0) {
         perror("shmget");
@@ -58,6 +61,11 @@ main()
     }
 
     if ((shmid2 = shmget(key2, SHMSZ2, IPC_CREAT | 0666)) < 0) {
+        perror("shmget");
+        exit(1);
+    }
+
+    if ((shmid3 = shmget(key3, SHMSZ3, IPC_CREAT | 0666)) < 0) {
         perror("shmget");
         exit(1);
     }
@@ -72,6 +80,11 @@ main()
         exit(1);
     }
 
+    if ((semVar = (sem_t*)shmat(shmid3, NULL, 0)) == (sem_t *) -1) {
+        perror("shmat");
+        exit(1);
+    }
+
     // 40 bytes for 1 request
 
     // q2, q3, q4 point to head of individual queues
@@ -79,7 +92,16 @@ main()
     q3 = q2 + requestsPerQueue;
     q4 = q3 + requestsPerQueue;
 
+    // Initialize binary semaphore
+    for(i=0; i<numQueues; i++)  	/* initialize mutex to 1 - binary semaphore */
+    {					/* second param = 0 - semaphore is local */
+    	sem_init(semVar, 1, 1);
+	semVar++; 
+    }                             
+
+    printf("initialized semaphore variable\n");
     client_request *q_init_iterator = q1;
+
     // **** Initialization of request queue parameters for all queues
 
     for(i=1; i<numQueues*requestsPerQueue; i++, q_init_iterator++)
@@ -99,10 +121,10 @@ main()
        *int_iterator = 0;
     }
 
-    // Loop forever
+    // Loop forever waiting for requests from clients
     while(1){
-        sleep(10);
-	    //printf("queue full = %d \b", *queue_full);
+        
+        sleep(5);
          // Check if queue 1 has data
          if(*queue_full != 1){
             printf("queue 1 empty\n");
@@ -219,15 +241,7 @@ main()
                 }    
             }    
          }
-    }
-
-   
-    // if (q1->full == 1){
-    //     printf("\n PID = %d, reqID= %d, input = %d, output= %d, fifo_priority = %d, valid= %d, full= %d \n", q1->PID, q1->reqID, q1->input, q1->output, q1->fifo_priority, q1->valid, q1->full);
-    // }   
-
-    // Detach and remove the shared memory segment
-    
+    }    
 }
 
 int call_service(int input){
